@@ -49,11 +49,13 @@ CModel* Cube;
 CModel* Floor;
 CCamera* Camera;
 CModel* Sphere;
+CModel* Teapot;
 
 // Textures - no texture class yet so using DirectX variables
 ID3D10ShaderResourceView* CubeDiffuseMap = NULL;
 ID3D10ShaderResourceView* FloorDiffuseMap = NULL;
 ID3D10ShaderResourceView* SphereDiffuseMap = NULL;
+ID3D10ShaderResourceView* TeapotDiffuseMap = NULL;
 
 // Light data - stored manually as there is no light class
 D3DXVECTOR3 Light1Colour = D3DXVECTOR3( 1.0f, 0.0f, 0.7f );
@@ -114,6 +116,14 @@ ID3D10Texture2D*        DepthStencil = NULL;
 ID3D10DepthStencilView* DepthStencilView = NULL;
 ID3D10RenderTargetView* RenderTargetView = NULL;
 
+// Light Effect variables
+ID3D10EffectVectorVariable* g_pCameraPosVar = NULL;
+ID3D10EffectVectorVariable* g_pLightPosVar = NULL;
+ID3D10EffectVectorVariable* g_pLightColourVar = NULL;
+ID3D10EffectVectorVariable* g_pLight2PosVar = NULL;
+ID3D10EffectVectorVariable* g_pLight2ColourVar = NULL;
+ID3D10EffectVectorVariable* g_pAmbientColourVar = NULL;
+ID3D10EffectScalarVariable* g_pSpecularPowerVar = NULL;
 
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
@@ -220,11 +230,13 @@ void ReleaseResources()
 	delete Floor;
 	delete Cube;
 	delete Sphere;
+	delete Teapot;
 	delete Camera;
 
     if( FloorDiffuseMap )  FloorDiffuseMap->Release();
     if( CubeDiffuseMap )   CubeDiffuseMap->Release();
 	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
+	if (TeapotDiffuseMap)  TeapotDiffuseMap->Release();
 	if( Effect )           Effect->Release();
 	if( DepthStencilView ) DepthStencilView->Release();
 	if( RenderTargetView ) RenderTargetView->Release();
@@ -275,6 +287,17 @@ bool LoadEffectFile()
 
 	// Other variables
 	colourMultiVar = Effect->GetVariableByName("colourMulti")->AsScalar();
+
+	// Light variables
+	g_pCameraPosVar = Effect->GetVariableByName("CameraPos")->AsVector();
+	g_pLightPosVar = Effect->GetVariableByName("LightPos")->AsVector();
+	g_pLightColourVar = Effect->GetVariableByName("LightColour")->AsVector();
+	g_pLight2PosVar = Effect->GetVariableByName("Light2Pos")->AsVector();
+	g_pLight2ColourVar = Effect->GetVariableByName("Light2Colour")->AsVector();
+	g_pAmbientColourVar = Effect->GetVariableByName("AmbientColour")->AsVector();
+	g_pSpecularPowerVar = Effect->GetVariableByName("SpecularPower")->AsScalar();
+
+
 	return true;
 }
 
@@ -301,6 +324,7 @@ bool InitScene()
 	Cube = new CModel;
 	Sphere = new CModel;
 	Floor = new CModel;
+	Teapot = new CModel;
 	Light1 = new CModel;
 	Light2 = new CModel;
 
@@ -308,6 +332,7 @@ bool InitScene()
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
 	if (!Cube->  Load( "Cube.x", VertexTexTechnique)) return false;
 	if (!Sphere->Load("Sphere.x", VertexChangingTexTechnique)) return false;
+	if (!Teapot->Load("Teapot.x", VertexTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
@@ -316,6 +341,7 @@ bool InitScene()
 	Cube->SetPosition( D3DXVECTOR3(0, 10, 0) );
 	Sphere->SetPosition(D3DXVECTOR3(30, 20, 50));
 	Sphere->SetScale(0.5f);
+	Teapot->SetPosition(D3DXVECTOR3(0, 10, 40));
 	Light1->SetPosition( D3DXVECTOR3(30, 10, 0) );
 	Light1->SetScale( 0.1f ); // Nice if size of light reflects its brightness
 	Light2->SetPosition( D3DXVECTOR3(-20, 30, 50) );
@@ -330,6 +356,8 @@ bool InitScene()
 	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"WoodDiffuseSpecular.dds", NULL, NULL, &FloorDiffuseMap, NULL)))
 		return false;
 	if (FAILED( D3DX10CreateShaderResourceViewFromFile( g_pd3dDevice, L"BushDiffuseSpecularAlpha.dds",  NULL, NULL, &SphereDiffuseMap, NULL ) ))
+		return false;
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"PalletA.dds", NULL, NULL, &TeapotDiffuseMap, NULL)))
 		return false;
 
 	return true;
@@ -365,6 +393,16 @@ void UpdateScene( float frameTime )
 	float x = fmod(runtime,5);
 	colourMultiVar->SetFloat(fmod(runtime, 5)*0.2f);
 	Sphere->UpdateMatrix();
+
+	Teapot->UpdateMatrix();
+	g_pLightPosVar->SetRawValue(LightPosition, 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
+	g_pLightColourVar->SetRawValue(LightColour, 0, 12);
+	g_pAmbientColourVar->SetRawValue(AmbientColour, 0, 12);
+	g_pSpecularPowerVar->SetFloat(SpecularPower);
+	g_pCameraPosVar->SetRawValue(CameraPosition, 0, 12);
+
+	g_pLight2PosVar->SetRawValue(LightPosition2, 0, 12);
+	g_pLight2ColourVar->SetRawValue(LightColour2, 0, 12);
 }
 
 
@@ -402,8 +440,11 @@ void RenderScene()
 
 	WorldMatrixVar->SetMatrix((float*)Sphere->GetWorldMatrix());
 	DiffuseMapVar->SetResource(SphereDiffuseMap);
-	ModelColourVar->SetRawValue(Blue, 0, 12);
 	Sphere->Render(VertexChangingTexTechnique);
+
+	WorldMatrixVar->SetMatrix((float*)Teapot->GetWorldMatrix());
+	DiffuseMapVar->SetResource(TeapotDiffuseMap);
+	Teapot->Render(VertexTexTechnique);
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );
