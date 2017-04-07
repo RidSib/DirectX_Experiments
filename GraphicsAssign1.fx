@@ -73,6 +73,7 @@ float3 CameraPos;
 // Normal map
 Texture2D NormalMap;
 
+float ParallaxDepth;
 // multiplier for sphere colour. changes over time
 float colourMulti;
 
@@ -258,13 +259,10 @@ float4 NormalMapLighting(VS_NORMALMAP_OUTPUT vOut) : SV_Target
 
 	float3 worldNormal = normalize(mul(mul(textureNormal, invTangentMatrix), WorldMatrix));
 
-	///////////////////////
-	// Calculate lighting
-
 	// Calculate direction of camera
 	float3 CameraDir = normalize(CameraPos - vOut.WorldPos.xyz); // Position of camera - position of current vertex (or pixel) (in world space)
 
-																 //// LIGHT 1
+	//// LIGHT 1
 	float3 Light1Dir = normalize(Light1Pos - vOut.WorldPos.xyz);   // Direction for each light is different
 	float3 Light1Dist = length(Light1Pos - vOut.WorldPos.xyz);
 	float3 DiffuseLight1 = Light1Colour * max(dot(worldNormal.xyz, Light1Dir), 0) / Light1Dist;
@@ -282,19 +280,11 @@ float4 NormalMapLighting(VS_NORMALMAP_OUTPUT vOut) : SV_Target
 	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
 	float3 SpecularLight = SpecularLight1 + SpecularLight2;
 
-
-	////////////////////
-	// Sample texture
-
 	// Extract diffuse material colour for this pixel from a texture (using float3, so we get RGB - i.e. ignore any alpha in the texture)
 	float4 DiffuseMaterial = DiffuseMap.Sample(Trilinear, vOut.UV);
 
 	// Assume specular material colour is white (i.e. highlights are a full, untinted reflection of light)
 	float3 SpecularMaterial = DiffuseMaterial.a;
-
-
-	////////////////////
-	// Combine colours 
 
 	// Combine maps and lighting for final pixel colour
 	float4 combinedColour;
@@ -303,6 +293,75 @@ float4 NormalMapLighting(VS_NORMALMAP_OUTPUT vOut) : SV_Target
 
 	return combinedColour;
 }
+
+// parallax shader
+
+float4 NormalMapLightingPara(VS_NORMALMAP_OUTPUT vOut) : SV_Target
+{
+	// Renormalise pixel normal/tangent that were *interpolated* from the vertex normals/tangents (and may have been scaled too)
+	float3 modelNormal = normalize(vOut.ModelNormal);
+	float3 modelTangent = normalize(vOut.ModelTangent);
+
+	// Calculate bi-tangent to complete the three axes of tangent space. Then create the *inverse* tangent matrix to convert *from* tangent space into model space
+	float3 modelBiTangent = cross(modelNormal, modelTangent);
+	float3x3 invTangentMatrix = float3x3(modelTangent, modelBiTangent, modelNormal);
+
+	// PARALLAX start
+
+	// Get normalised vector to camera for parallax mapping and specular equation (this vector was calculated later in previous shaders)
+	float3 CameraDir = normalize(CameraPos - vOut.WorldPos.xyz);
+
+	float3x3 invWorldMatrix = transpose(WorldMatrix);
+	float3 cameraModelDir = normalize(mul(CameraDir, invWorldMatrix)); // Normalise in case world matrix is scaled
+
+	float3x3 tangentMatrix = transpose(invTangentMatrix);
+	float2 textureOffsetDir = mul(cameraModelDir, tangentMatrix);
+
+	float texDepth = ParallaxDepth * (NormalMap.Sample(Trilinear, vOut.UV).a - 0.5f);
+
+	// Use the depth of the texture to offset the given texture coordinate - this corrected texture coordinate will be used from here on
+	float2 offsetTexCoord = vOut.UV + texDepth * textureOffsetDir;
+
+	// PARALLAX end
+
+	// Get the texture normal from the normal map. The r,g,b pixel values actually store x,y,z components of a normal. However, r,g,b
+	// values are stored in the range 0->1, whereas the x, y & z components should be in the range -1->1. So some scaling is needed
+	float3 textureNormal = 2.0f * NormalMap.Sample(Trilinear, offsetTexCoord) - 1.0f; // Scale from 0->1 to -1->1
+
+																						  // Now convert the texture normal into model space using the inverse tangent matrix, and then convert into world space using the world
+																						  // matrix. Normalise, because of the effects of texture filtering and in case the world matrix contains scaling
+	float3 worldNormal = normalize(mul(mul(textureNormal, invTangentMatrix), WorldMatrix));
+
+	//// LIGHT 1
+	float3 Light1Dir = normalize(Light1Pos - vOut.WorldPos.xyz);   // Direction for each light is different
+	float3 Light1Dist = length(Light1Pos - vOut.WorldPos.xyz);
+	float3 DiffuseLight1 = Light1Colour * max(dot(worldNormal.xyz, Light1Dir), 0) / Light1Dist;
+	float3 halfway = normalize(Light1Dir + CameraDir);
+	float3 SpecularLight1 = DiffuseLight1 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
+
+	//// LIGHT 2
+	float3 Light2Dir = normalize(Light2Pos - vOut.WorldPos.xyz);
+	float3 Light2Dist = length(Light2Pos - vOut.WorldPos.xyz);
+	float3 DiffuseLight2 = Light2Colour * max(dot(worldNormal.xyz, Light2Dir), 0) / Light2Dist;
+	halfway = normalize(Light2Dir + CameraDir);
+	float3 SpecularLight2 = DiffuseLight2 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
+
+	// Sum the effect of the two lights - add the ambient at this stage rather than for each light (or we will get twice the ambient level)
+	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
+	float3 SpecularLight = SpecularLight1 + SpecularLight2;
+
+	// Extract diffuse and specular material colour for this pixel from a texture (use offset texture coordinate from parallax mapping)
+	float4 DiffuseMaterial = DiffuseMap.Sample(Trilinear, offsetTexCoord);
+	float3 SpecularMaterial = DiffuseMaterial.a;
+
+	// Combine maps and lighting for final pixel colour
+	float4 combinedColour;
+	combinedColour.rgb = DiffuseMaterial * DiffuseLight + SpecularMaterial * SpecularLight;
+	combinedColour.a = 1.0f; // No alpha processing in this shader, so just set it to 1
+
+	return combinedColour;
+}
+
 
 RasterizerState CullNone  // Cull none of the polygons, i.e. show both sides
 {
@@ -390,6 +449,21 @@ technique10 NormalMapping
 		SetVertexShader(CompileShader(vs_4_0, NormalMapTransform()));
 		SetGeometryShader(NULL);
 		SetPixelShader(CompileShader(ps_4_0, NormalMapLighting()));
+
+		// Switch off blending states
+		SetBlendState(NoBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xFFFFFFFF);
+		SetRasterizerState(CullBack);
+		SetDepthStencilState(DepthWritesOn, 0);
+	}
+}
+
+technique10 NormalMappingPara
+{
+	pass P0
+	{
+		SetVertexShader(CompileShader(vs_4_0, NormalMapTransform()));
+		SetGeometryShader(NULL);
+		SetPixelShader(CompileShader(ps_4_0, NormalMapLightingPara()));
 
 		// Switch off blending states
 		SetBlendState(NoBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xFFFFFFFF);

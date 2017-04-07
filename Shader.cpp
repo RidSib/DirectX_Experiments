@@ -10,6 +10,8 @@ ID3D10EffectTechnique* VertexTexTechnique = NULL;
 ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
 ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
 ID3D10EffectTechnique* NormalMappingTechnique = NULL;
+ID3D10EffectTechnique* NormalMappingParaTechnique = NULL;
+
 // Light Effect variables
 ID3D10EffectVectorVariable* g_pCameraPosVar = NULL;
 ID3D10EffectVectorVariable* g_pLightPosVar = NULL;
@@ -27,6 +29,7 @@ ID3D10EffectMatrixVariable* ViewProjMatrixVar = NULL;
 
 // Variables
 ID3D10EffectScalarVariable* colourMultiVar = NULL;
+ID3D10EffectScalarVariable* ParallaxDepthVar = NULL; // To set the depth of the parallax mapping effect
 
 // Textures - no texture class yet so using DirectX variables
 ID3D10ShaderResourceView* CubeDiffuseMap = NULL;
@@ -36,6 +39,9 @@ ID3D10ShaderResourceView* TeapotDiffuseMap = NULL;
 ID3D10ShaderResourceView* TrollDiffuseMap = NULL;
 ID3D10ShaderResourceView* Cube2DiffuseMap = NULL;
 ID3D10ShaderResourceView* Cube2NormalMap = NULL;
+ID3D10ShaderResourceView* Teapot2DiffuseMap = NULL;
+ID3D10ShaderResourceView* Teapot2NormalMap = NULL;
+
 // Miscellaneous
 ID3D10EffectVectorVariable* ModelColourVar = NULL;
 
@@ -69,6 +75,7 @@ bool LoadEffectFile()
 	VertexChangingTexTechnique = Effect->GetTechniqueByName("VertexChangingTex");
 	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
 	NormalMappingTechnique = Effect->GetTechniqueByName("NormalMapping");
+	NormalMappingParaTechnique = Effect->GetTechniqueByName("NormalMappingPara");
 
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar = Effect->GetVariableByName("WorldMatrix")->AsMatrix();
@@ -94,6 +101,7 @@ bool LoadEffectFile()
 	g_pAmbientColourVar = Effect->GetVariableByName("AmbientColour")->AsVector();
 	g_pSpecularPowerVar = Effect->GetVariableByName("SpecularPower")->AsScalar();
 	NormalMapVar = Effect->GetVariableByName("NormalMap")->AsShaderResource();
+	ParallaxDepthVar = Effect->GetVariableByName("ParallaxDepth")->AsScalar();
 
 	return true;
 }
@@ -106,6 +114,8 @@ void ReleaseShaders()
 	if (CubeDiffuseMap)   CubeDiffuseMap->Release();
 	if (Cube2DiffuseMap)   Cube2DiffuseMap->Release();
 	if (Cube2NormalMap)   Cube2NormalMap->Release();
+	if (Teapot2DiffuseMap)   Teapot2DiffuseMap->Release();
+	if (Teapot2NormalMap)   Teapot2NormalMap->Release();
 	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
 	if (TeapotDiffuseMap)  TeapotDiffuseMap->Release();
 	if (TrollDiffuseMap)  TrollDiffuseMap->Release();
