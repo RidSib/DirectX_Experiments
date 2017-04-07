@@ -83,6 +83,7 @@ ID3D10Effect*          Effect = NULL;
 ID3D10EffectTechnique* PlainColourTechnique = NULL;
 ID3D10EffectTechnique* VertexTexTechnique = NULL;
 ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
+ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
 
 // Matrices
 ID3D10EffectMatrixVariable* WorldMatrixVar = NULL;
@@ -273,6 +274,7 @@ bool LoadEffectFile()
 	PlainColourTechnique = Effect->GetTechniqueByName( "PlainColour" );
 	VertexTexTechnique = Effect->GetTechniqueByName("VertexTex");
 	VertexChangingTexTechnique = Effect->GetTechniqueByName("VertexChangingTex");
+	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar    = Effect->GetVariableByName( "WorldMatrix" )->AsMatrix();
 	ViewMatrixVar     = Effect->GetVariableByName( "ViewMatrix"  )->AsMatrix();
@@ -332,7 +334,7 @@ bool InitScene()
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
 	if (!Cube->  Load( "Cube.x", VertexTexTechnique)) return false;
 	if (!Sphere->Load("Sphere.x", VertexChangingTexTechnique)) return false;
-	if (!Teapot->Load("Teapot.x", VertexTexTechnique)) return false;
+	if (!Teapot->Load("Teapot.x", VertexLitTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
@@ -393,6 +395,7 @@ void UpdateScene( float frameTime )
 	colourMultiVar->SetFloat(fmod(runtime, 5)*0.2f);
 	Sphere->UpdateMatrix();
 
+	Teapot->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
 	Teapot->UpdateMatrix();
 
 	g_pLightPosVar->SetRawValue(Light1->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
@@ -443,7 +446,7 @@ void RenderScene()
 
 	WorldMatrixVar->SetMatrix((float*)Teapot->GetWorldMatrix());
 	DiffuseMapVar->SetResource(TeapotDiffuseMap);
-	Teapot->Render(VertexTexTechnique);
+	Teapot->Render(VertexLitTexTechnique);
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );

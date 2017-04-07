@@ -163,18 +163,20 @@ float4 VertexLitDiffuseMap(VS_LIGHTING_OUTPUT vOut) : SV_Target  // The ": SV_Ta
 	//// LIGHT 1
 	float3 Light1Dir = normalize(Light1Pos - vOut.WorldPos.xyz);   // Direction for each light is different
 	float Light1Dist = length(Light1Pos - vOut.WorldPos.xyz);
-	float3 DiffuseLight1 = (Light1Colour * saturate(dot(worldNormal.xyz, Light1Dir))) / Light1Dist;
+	float3 DiffuseLight1 = (Light1Colour * saturate(dot(worldNormal.xyz, Light1Dir))); // / Light1Dist;
 	float3 halfway = normalize(Light1Dir + CameraDir);
-	//float3 SpecularLight1 = DiffuseLight1 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
-	float3 SpecularLight1 = (Light1Colour / Light1Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
+	float3 SpecularLight1 = DiffuseLight1 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
+	// attenuation
+	//float3 SpecularLight1 = (Light1Colour / Light1Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
 
 	//// LIGHT 2
 	float3 Light2Dir = normalize(Light2Pos - vOut.WorldPos.xyz);
 	float Light2Dist = length(Light2Pos - vOut.WorldPos.xyz);
-	float3 DiffuseLight2 = (Light2Colour * saturate(dot(worldNormal.xyz, Light2Dir))) / Light2Dist;
+	float3 DiffuseLight2 = (Light2Colour * saturate(dot(worldNormal.xyz, Light2Dir))); // / Light2Dist;
 	halfway = normalize(Light2Dir + CameraDir);
-	//float3 SpecularLight2 = DiffuseLight2 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
-	float3 SpecularLight2 = (Light2Colour / Light2Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
+	float3 SpecularLight2 = DiffuseLight2 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
+	// attenuation
+	//float3 SpecularLight2 = (Light2Colour / Light2Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
 
 	// Sum the effect of the two lights - add the ambient at this stage rather than for each light (or we will get twice the ambient level)
 	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
