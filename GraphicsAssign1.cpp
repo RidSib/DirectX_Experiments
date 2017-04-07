@@ -48,10 +48,12 @@
 CModel* Cube;
 CModel* Floor;
 CCamera* Camera;
+CModel* Sphere;
 
 // Textures - no texture class yet so using DirectX variables
 ID3D10ShaderResourceView* CubeDiffuseMap = NULL;
 ID3D10ShaderResourceView* FloorDiffuseMap = NULL;
+ID3D10ShaderResourceView* SphereDiffuseMap = NULL;
 
 // Light data - stored manually as there is no light class
 D3DXVECTOR3 Light1Colour = D3DXVECTOR3( 1.0f, 0.0f, 0.7f );
@@ -214,10 +216,12 @@ void ReleaseResources()
 	delete Light1;
 	delete Floor;
 	delete Cube;
+	delete Sphere;
 	delete Camera;
 
     if( FloorDiffuseMap )  FloorDiffuseMap->Release();
     if( CubeDiffuseMap )   CubeDiffuseMap->Release();
+	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
 	if( Effect )           Effect->Release();
 	if( DepthStencilView ) DepthStencilView->Release();
 	if( RenderTargetView ) RenderTargetView->Release();
@@ -290,6 +294,7 @@ bool InitScene()
 	// Load/Create models
 
 	Cube = new CModel;
+	Sphere = new CModel;
 	Floor = new CModel;
 	Light1 = new CModel;
 	Light2 = new CModel;
@@ -297,12 +302,15 @@ bool InitScene()
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
 	if (!Cube->  Load( "Cube.x", VertexTexTechnique)) return false;
+	if (!Sphere->Load("Sphere.x", VertexTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
 
 	// Initial positions
 	Cube->SetPosition( D3DXVECTOR3(0, 10, 0) );
+	Sphere->SetPosition(D3DXVECTOR3(30, 20, 50));
+	Sphere->SetScale(0.5f);
 	Light1->SetPosition( D3DXVECTOR3(30, 10, 0) );
 	Light1->SetScale( 0.1f ); // Nice if size of light reflects its brightness
 	Light2->SetPosition( D3DXVECTOR3(-20, 30, 50) );
@@ -314,7 +322,9 @@ bool InitScene()
 
 	if (FAILED( D3DX10CreateShaderResourceViewFromFile( g_pd3dDevice, L"StoneDiffuseSpecular.dds", NULL, NULL, &CubeDiffuseMap,  NULL ) ))
 		return false;
-	if (FAILED( D3DX10CreateShaderResourceViewFromFile( g_pd3dDevice, L"WoodDiffuseSpecular.dds",  NULL, NULL, &FloorDiffuseMap, NULL ) ))
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"WoodDiffuseSpecular.dds", NULL, NULL, &FloorDiffuseMap, NULL)))
+		return false;
+	if (FAILED( D3DX10CreateShaderResourceViewFromFile( g_pd3dDevice, L"BushDiffuseSpecularAlpha.dds",  NULL, NULL, &SphereDiffuseMap, NULL ) ))
 		return false;
 
 	return true;
@@ -332,6 +342,8 @@ void UpdateScene( float frameTime )
 	// Control cube position and update its world matrix each frame
 	Cube->Control( frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma );
 	Cube->UpdateMatrix();
+
+	Sphere->UpdateMatrix();
 
 	// Update the orbiting light - a bit of a cheat with the static variable [ask the tutor if you want to know what this is]
 	static float Rotate = 0.0f;
@@ -375,6 +387,11 @@ void RenderScene()
     DiffuseMapVar->SetResource( CubeDiffuseMap );                 // Send the cube's diffuse/specular map to the shader
 	ModelColourVar->SetRawValue( Blue, 0, 12 );           // Set a single colour to render the model
 	Cube->Render(VertexTexTechnique);                         // Pass rendering technique to the model class
+
+	WorldMatrixVar->SetMatrix((float*)Sphere->GetWorldMatrix());
+	DiffuseMapVar->SetResource(SphereDiffuseMap);
+	ModelColourVar->SetRawValue(Blue, 0, 12);
+	Sphere->Render(VertexTexTechnique);
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );
