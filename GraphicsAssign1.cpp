@@ -63,6 +63,12 @@ D3DXVECTOR3 Light2Colour = D3DXVECTOR3( 1.0f, 0.8f, 0.2f );
 D3DXVECTOR3 AmbientColour = D3DXVECTOR3( 0.2f, 0.2f, 0.2f );
 float SpecularPower = 256.0f;
 
+// changing lights variables
+
+D3DXVECTOR3 cLight1Colour = D3DXVECTOR3(1.0f, 0.0f, 0.7f);
+D3DXVECTOR3 cLight2Colour = D3DXVECTOR3(1.0f, 0.8f, 0.2f);
+
+
 // Display models where the lights are. One of the lights will follow an orbit
 CModel* Light1;
 CModel* Light2;
@@ -390,19 +396,24 @@ void UpdateScene( float frameTime )
 	Light2->UpdateMatrix();
 
 	// Sphere brightness/colour calculation
-	float static runtime = 0.0f;
-	runtime += frameTime;
-	colourMultiVar->SetFloat(fmod(runtime, 5)*0.2f);
+	float static runtimeFloat = 0.0f;
+	runtimeFloat += frameTime;
+	colourMultiVar->SetFloat(fmod(runtimeFloat, 5)*0.2f);
 	Sphere->UpdateMatrix();
 
 	Teapot->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
 	Teapot->UpdateMatrix();
-	//int runtimeInt = static_cast<int>(runtime);
-	//(runtimeInt % 2)
+
+	int runtimeInt = static_cast<int>(runtimeFloat);
+
+	// Light 2, gradualy changing blue value in Light 2
+	float belowTwoSec = fmod(runtimeFloat, 2.0f);
+	cLight1Colour = Light1Colour * (runtimeInt % 2);
+	cLight2Colour = D3DXVECTOR3(Light2Colour.x, Light2Colour.y, (belowTwoSec > 1.0f ? 2.0f - belowTwoSec : belowTwoSec) + Light2Colour.z);
 	g_pLightPosVar->SetRawValue(Light1->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
-	g_pLightColourVar->SetRawValue(Light1Colour, 0, 12);
+	g_pLightColourVar->SetRawValue(cLight1Colour, 0, 12);
 	g_pLight2PosVar->SetRawValue(Light2->GetPosition(), 0, 12);
-	g_pLight2ColourVar->SetRawValue(Light2Colour, 0, 12);
+	g_pLight2ColourVar->SetRawValue(cLight2Colour, 0, 12);
 	g_pAmbientColourVar->SetRawValue(AmbientColour, 0, 12);
 	g_pSpecularPowerVar->SetFloat(SpecularPower);
 	g_pCameraPosVar->SetRawValue(Camera->GetPosition(), 0, 12);
@@ -456,11 +467,13 @@ void RenderScene()
 	Floor->Render(VertexTexTechnique);
 
 	WorldMatrixVar->SetMatrix( (float*)Light1->GetWorldMatrix() );
-	ModelColourVar->SetRawValue( Light1Colour, 0, 12 );
+	//ModelColourVar->SetRawValue( Light1Colour, 0, 12 );
+	ModelColourVar->SetRawValue(cLight1Colour, 0, 12);
 	Light1->Render( PlainColourTechnique );
 
 	WorldMatrixVar->SetMatrix( (float*)Light2->GetWorldMatrix() );
-	ModelColourVar->SetRawValue( Light2Colour, 0, 12 );
+	//ModelColourVar->SetRawValue( Light2Colour, 0, 12 );
+	ModelColourVar->SetRawValue(cLight2Colour, 0, 12);
 	Light2->Render( PlainColourTechnique );
 
 
