@@ -61,6 +61,10 @@ float4x4 WorldMatrix;
 float4x4 ViewMatrix;
 float4x4 ProjMatrix;
 
+// directional light
+const float3 LightColour = { 1.0f, 0.8f, 0.4f };
+const float3 LightDir = { 0.707f, 0.707f, -0.707f };
+
 // variables for lighting calculation
 float3 Light1Pos;
 float3 Light2Pos;
@@ -332,23 +336,19 @@ float4 NormalMapLightingPara(VS_NORMALMAP_OUTPUT vOut) : SV_Target
 																						  // matrix. Normalise, because of the effects of texture filtering and in case the world matrix contains scaling
 	float3 worldNormal = normalize(mul(mul(textureNormal, invTangentMatrix), WorldMatrix));
 
-	//// LIGHT 1
-	float3 Light1Dir = normalize(Light1Pos - vOut.WorldPos.xyz);   // Direction for each light is different
-	float3 Light1Dist = length(Light1Pos - vOut.WorldPos.xyz);
-	float3 DiffuseLight1 = Light1Colour * max(dot(worldNormal.xyz, Light1Dir), 0) / Light1Dist;
-	float3 halfway = normalize(Light1Dir + CameraDir);
-	float3 SpecularLight1 = DiffuseLight1 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
+	//// LIGHT 1 directional light
+	float3 DiffuseLight1 = LightColour * saturate(dot(normalize(worldNormal), LightDir));
 
 	//// LIGHT 2
 	float3 Light2Dir = normalize(Light2Pos - vOut.WorldPos.xyz);
 	float3 Light2Dist = length(Light2Pos - vOut.WorldPos.xyz);
 	float3 DiffuseLight2 = Light2Colour * max(dot(worldNormal.xyz, Light2Dir), 0) / Light2Dist;
-	halfway = normalize(Light2Dir + CameraDir);
+	float3 halfway = normalize(Light2Dir + CameraDir);
 	float3 SpecularLight2 = DiffuseLight2 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
 
 	// Sum the effect of the two lights - add the ambient at this stage rather than for each light (or we will get twice the ambient level)
 	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
-	float3 SpecularLight = SpecularLight1 + SpecularLight2;
+	float3 SpecularLight = SpecularLight2;
 
 	// Extract diffuse and specular material colour for this pixel from a texture (use offset texture coordinate from parallax mapping)
 	float4 DiffuseMaterial = DiffuseMap.Sample(Trilinear, offsetTexCoord);
