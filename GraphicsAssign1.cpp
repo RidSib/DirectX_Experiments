@@ -33,8 +33,10 @@
 #include "resource.h"
 
 #include "Defines.h" // General definitions shared by all source files
+#include "Device.h"
 #include "Model.h"   // Model class - encapsulates working with vertex/index data and world matrix
 #include "Camera.h"  // Camera class - encapsulates the camera's view and projection matrix
+#include "Shader.h"
 #include "Input.h"   // Input functions - not DirectX
 
 
@@ -51,11 +53,7 @@ CCamera* Camera;
 CModel* Sphere;
 CModel* Teapot;
 
-// Textures - no texture class yet so using DirectX variables
-ID3D10ShaderResourceView* CubeDiffuseMap = NULL;
-ID3D10ShaderResourceView* FloorDiffuseMap = NULL;
-ID3D10ShaderResourceView* SphereDiffuseMap = NULL;
-ID3D10ShaderResourceView* TeapotDiffuseMap = NULL;
+
 
 // Light data - stored manually as there is no light class
 D3DXVECTOR3 Light1Colour = D3DXVECTOR3( 1.0f, 0.0f, 0.7f );
@@ -75,239 +73,11 @@ CModel* Light2;
 const float LightOrbitRadius = 20.0f;
 const float LightOrbitSpeed  = 0.5f;
 
-// Note: There are move & rotation speed constants in Defines.h
+// Variables used to setup the Window
+int       g_ViewportWidth;
+int       g_ViewportHeight;
 
 
-
-//--------------------------------------------------------------------------------------
-// Shader Variables
-//--------------------------------------------------------------------------------------
-// Variables to connect C++ code to HLSL shaders
-
-// Effects / techniques
-ID3D10Effect*          Effect = NULL;
-ID3D10EffectTechnique* PlainColourTechnique = NULL;
-ID3D10EffectTechnique* VertexTexTechnique = NULL;
-ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
-ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
-
-// Matrices
-ID3D10EffectMatrixVariable* WorldMatrixVar = NULL;
-ID3D10EffectMatrixVariable* ViewMatrixVar = NULL;
-ID3D10EffectMatrixVariable* ProjMatrixVar = NULL;
-ID3D10EffectMatrixVariable* ViewProjMatrixVar = NULL;
-
-// Variables
-ID3D10EffectScalarVariable* colourMultiVar = NULL;
-// Textures
-ID3D10EffectShaderResourceVariable* DiffuseMapVar = NULL;
-
-// Miscellaneous
-ID3D10EffectVectorVariable* ModelColourVar = NULL;
-
-
-//--------------------------------------------------------------------------------------
-// DirectX Variables
-//--------------------------------------------------------------------------------------
-
-// The main D3D interface, this pointer is used to access most D3D functions (and is shared across all cpp files through Defines.h)
-ID3D10Device* g_pd3dDevice = NULL;
-
-// Width and height of the window viewport
-int g_ViewportWidth;
-int g_ViewportHeight;
-
-// Variables used to setup D3D
-IDXGISwapChain*         SwapChain = NULL;
-ID3D10Texture2D*        DepthStencil = NULL;
-ID3D10DepthStencilView* DepthStencilView = NULL;
-ID3D10RenderTargetView* RenderTargetView = NULL;
-
-// Light Effect variables
-ID3D10EffectVectorVariable* g_pCameraPosVar = NULL;
-ID3D10EffectVectorVariable* g_pLightPosVar = NULL;
-ID3D10EffectVectorVariable* g_pLightColourVar = NULL;
-ID3D10EffectVectorVariable* g_pLight2PosVar = NULL;
-ID3D10EffectVectorVariable* g_pLight2ColourVar = NULL;
-ID3D10EffectVectorVariable* g_pAmbientColourVar = NULL;
-ID3D10EffectScalarVariable* g_pSpecularPowerVar = NULL;
-
-//--------------------------------------------------------------------------------------
-// Create Direct3D device and swap chain
-//--------------------------------------------------------------------------------------
-bool InitDevice(HWND hWnd)
-{
-	// Many DirectX functions return a "HRESULT" variable to indicate success or failure. Microsoft code often uses
-	// the FAILED macro to test this variable, you'll see it throughout the code - it's fairly self explanatory.
-	HRESULT hr = S_OK;
-
-
-	////////////////////////////////
-	// Initialise Direct3D
-
-	// Calculate the visible area the window we are using - the "client rectangle" refered to in the first function is the 
-	// size of the interior of the window, i.e. excluding the frame and title
-	RECT rc;
-	GetClientRect(hWnd, &rc);
-	g_ViewportWidth = rc.right - rc.left;
-	g_ViewportHeight = rc.bottom - rc.top;
-
-
-	// Create a Direct3D device (i.e. initialise D3D), and create a swap-chain (create a back buffer to render to)
-	DXGI_SWAP_CHAIN_DESC sd;         // Structure to contain all the information needed
-	ZeroMemory( &sd, sizeof( sd ) ); // Clear the structure to 0 - common Microsoft practice, not really good style
-	sd.BufferCount = 1;
-	sd.BufferDesc.Width = g_ViewportWidth;             // Target window size
-	sd.BufferDesc.Height = g_ViewportHeight;           // --"--
-	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // Pixel format of target window
-	sd.BufferDesc.RefreshRate.Numerator = 60;          // Refresh rate of monitor
-	sd.BufferDesc.RefreshRate.Denominator = 1;         // --"--
-	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	sd.SampleDesc.Count = 1;
-	sd.SampleDesc.Quality = 0;
-	sd.OutputWindow = hWnd;                            // Target window
-	sd.Windowed = TRUE;                                // Whether to render in a window (TRUE) or go fullscreen (FALSE)
-	hr = D3D10CreateDeviceAndSwapChain( NULL, D3D10_DRIVER_TYPE_HARDWARE, NULL, 0,
-										D3D10_SDK_VERSION, &sd, &SwapChain, &g_pd3dDevice );
-	if( FAILED( hr ) ) return false;
-
-
-	// Specify the render target as the back-buffer - this is an advanced topic. This code almost always occurs in the standard D3D setup
-	ID3D10Texture2D* pBackBuffer;
-	hr = SwapChain->GetBuffer( 0, __uuidof( ID3D10Texture2D ), ( LPVOID* )&pBackBuffer );
-	if( FAILED( hr ) ) return false;
-	hr = g_pd3dDevice->CreateRenderTargetView( pBackBuffer, NULL, &RenderTargetView );
-	pBackBuffer->Release();
-	if( FAILED( hr ) ) return false;
-
-
-	// Create a texture (bitmap) to use for a depth buffer
-	D3D10_TEXTURE2D_DESC descDepth;
-	descDepth.Width = g_ViewportWidth;
-	descDepth.Height = g_ViewportHeight;
-	descDepth.MipLevels = 1;
-	descDepth.ArraySize = 1;
-	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
-	descDepth.SampleDesc.Count = 1;
-	descDepth.SampleDesc.Quality = 0;
-	descDepth.Usage = D3D10_USAGE_DEFAULT;
-	descDepth.BindFlags = D3D10_BIND_DEPTH_STENCIL;
-	descDepth.CPUAccessFlags = 0;
-	descDepth.MiscFlags = 0;
-	hr = g_pd3dDevice->CreateTexture2D( &descDepth, NULL, &DepthStencil );
-	if( FAILED( hr ) ) return false;
-
-	// Create the depth stencil view, i.e. indicate that the texture just created is to be used as a depth buffer
-	D3D10_DEPTH_STENCIL_VIEW_DESC descDSV;
-	descDSV.Format = descDepth.Format;
-	descDSV.ViewDimension = D3D10_DSV_DIMENSION_TEXTURE2D;
-	descDSV.Texture2D.MipSlice = 0;
-	hr = g_pd3dDevice->CreateDepthStencilView( DepthStencil, &descDSV, &DepthStencilView );
-	if( FAILED( hr ) ) return false;
-
-	// Select the back buffer and depth buffer to use for rendering now
-	g_pd3dDevice->OMSetRenderTargets( 1, &RenderTargetView, DepthStencilView );
-
-
-	// Setup the viewport - defines which part of the window we will render to, almost always the whole window
-	D3D10_VIEWPORT vp;
-	vp.Width  = g_ViewportWidth;
-	vp.Height = g_ViewportHeight;
-	vp.MinDepth = 0.0f;
-	vp.MaxDepth = 1.0f;
-	vp.TopLeftX = 0;
-	vp.TopLeftY = 0;
-	g_pd3dDevice->RSSetViewports( 1, &vp );
-
-	return true;
-}
-
-
-// Release the memory held by all objects created
-void ReleaseResources()
-{
-	// The D3D setup and preparation of the geometry created several objects that use up memory (e.g. textures, vertex/index buffers etc.)
-	// Each object that allocates memory (or hardware resources) needs to be "released" when we exit the program
-	// There is similar code in every D3D program, but the list of objects that need to be released depends on what was created
-	// Test each variable to see if it exists before deletion
-	if( g_pd3dDevice )     g_pd3dDevice->ClearState();
-
-	delete Light2;
-	delete Light1;
-	delete Floor;
-	delete Cube;
-	delete Sphere;
-	delete Teapot;
-	delete Camera;
-
-    if( FloorDiffuseMap )  FloorDiffuseMap->Release();
-    if( CubeDiffuseMap )   CubeDiffuseMap->Release();
-	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
-	if (TeapotDiffuseMap)  TeapotDiffuseMap->Release();
-	if( Effect )           Effect->Release();
-	if( DepthStencilView ) DepthStencilView->Release();
-	if( RenderTargetView ) RenderTargetView->Release();
-	if( DepthStencil )     DepthStencil->Release();
-	if( SwapChain )        SwapChain->Release();
-	if( g_pd3dDevice )     g_pd3dDevice->Release();
-
-}
-
-
-
-//--------------------------------------------------------------------------------------
-// Load and compile Effect file (.fx file containing shaders)
-//--------------------------------------------------------------------------------------
-// An effect file contains a set of "Techniques". A technique is a combination of vertex, geometry and pixel shaders (and some states) used for
-// rendering in a particular way. We load the effect file at runtime (it's written in HLSL and has the extension ".fx"). The effect code is compiled
-// *at runtime* into low-level GPU language. When rendering a particular model we specify which technique from the effect file that it will use
-//
-bool LoadEffectFile()
-{
-	ID3D10Blob* pErrors; // This strangely typed variable collects any errors when compiling the effect file
-	DWORD dwShaderFlags = D3D10_SHADER_ENABLE_STRICTNESS; // These "flags" are used to set the compiler options
-
-	// Load and compile the effect file
-	HRESULT hr = D3DX10CreateEffectFromFile( L"GraphicsAssign1.fx", NULL, NULL, "fx_4_0", dwShaderFlags, 0, g_pd3dDevice, NULL, NULL, &Effect, &pErrors, NULL );
-	if( FAILED( hr ) )
-	{
-		if (pErrors != 0)  MessageBox( NULL, CA2CT(reinterpret_cast<char*>(pErrors->GetBufferPointer())), L"Error", MB_OK ); // Compiler error: display error message
-		else               MessageBox( NULL, L"Error loading FX file. Ensure your FX file is in the same folder as this executable.", L"Error", MB_OK );  // No error message - probably file not found
-		return false;
-	}
-
-	// Now we can select techniques from the compiled effect file
-	PlainColourTechnique = Effect->GetTechniqueByName( "PlainColour" );
-	VertexTexTechnique = Effect->GetTechniqueByName("VertexTex");
-	VertexChangingTexTechnique = Effect->GetTechniqueByName("VertexChangingTex");
-	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
-	// Create special variables to allow us to access global variables in the shaders from C++
-	WorldMatrixVar    = Effect->GetVariableByName( "WorldMatrix" )->AsMatrix();
-	ViewMatrixVar     = Effect->GetVariableByName( "ViewMatrix"  )->AsMatrix();
-	ProjMatrixVar     = Effect->GetVariableByName( "ProjMatrix"  )->AsMatrix();
-
-	// We access the texture variable in the shader in the same way as we have before for matrices, light data etc.
-	// Only difference is that this variable is a "Shader Resource"
-	DiffuseMapVar = Effect->GetVariableByName( "DiffuseMap" )->AsShaderResource();
-
-	// Other shader variables
-	ModelColourVar = Effect->GetVariableByName( "ModelColour"  )->AsVector();
-
-	// Other variables
-	colourMultiVar = Effect->GetVariableByName("colourMulti")->AsScalar();
-
-	// Light variables
-	g_pCameraPosVar = Effect->GetVariableByName("CameraPos")->AsVector();
-	g_pLightPosVar = Effect->GetVariableByName("Light1Pos")->AsVector();
-	g_pLightColourVar = Effect->GetVariableByName("Light1Colour")->AsVector();
-	g_pLight2PosVar = Effect->GetVariableByName("Light2Pos")->AsVector();
-	g_pLight2ColourVar = Effect->GetVariableByName("Light2Colour")->AsVector();
-	g_pAmbientColourVar = Effect->GetVariableByName("AmbientColour")->AsVector();
-	g_pSpecularPowerVar = Effect->GetVariableByName("SpecularPower")->AsScalar();
-
-
-	return true;
-}
 
 
 
@@ -398,7 +168,7 @@ void UpdateScene( float frameTime )
 	// Sphere brightness/colour calculation
 	float static runtimeFloat = 0.0f;
 	runtimeFloat += frameTime;
-	colourMultiVar->SetFloat(fmod(runtimeFloat, 5)*0.2f);
+	colourMultiVar->SetFloat(fmod(runtimeFloat, 5.0f)*0.2f);
 	Sphere->UpdateMatrix();
 
 	Teapot->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
@@ -482,4 +252,15 @@ void RenderScene()
 
 	// After we've finished drawing to the off-screen back buffer, we "present" it to the front buffer (the screen)
 	SwapChain->Present( 0, 0 );
+}
+
+void ReleaseResources()
+{
+	delete Light2;
+	delete Light1;
+	delete Floor;
+	delete Cube;
+	delete Sphere;
+	delete Teapot;
+	delete Camera;
 }
