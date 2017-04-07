@@ -292,8 +292,8 @@ bool LoadEffectFile()
 
 	// Light variables
 	g_pCameraPosVar = Effect->GetVariableByName("CameraPos")->AsVector();
-	g_pLightPosVar = Effect->GetVariableByName("LightPos")->AsVector();
-	g_pLightColourVar = Effect->GetVariableByName("LightColour")->AsVector();
+	g_pLightPosVar = Effect->GetVariableByName("Light1Pos")->AsVector();
+	g_pLightColourVar = Effect->GetVariableByName("Light1Colour")->AsVector();
 	g_pLight2PosVar = Effect->GetVariableByName("Light2Pos")->AsVector();
 	g_pLight2ColourVar = Effect->GetVariableByName("Light2Colour")->AsVector();
 	g_pAmbientColourVar = Effect->GetVariableByName("AmbientColour")->AsVector();
@@ -397,7 +397,8 @@ void UpdateScene( float frameTime )
 
 	Teapot->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
 	Teapot->UpdateMatrix();
-
+	//int runtimeInt = static_cast<int>(runtime);
+	//(runtimeInt % 2)
 	g_pLightPosVar->SetRawValue(Light1->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
 	g_pLightColourVar->SetRawValue(Light1Colour, 0, 12);
 	g_pLight2PosVar->SetRawValue(Light2->GetPosition(), 0, 12);
