@@ -48,11 +48,12 @@
 // The CModel class collects together geometry and world matrix, and provides functions to control the model and render it
 // The CCamera class handles the view and projections matrice, and provides functions to control the camera
 CModel* Cube;
+CModel* Cube2;
 CModel* Floor;
 CCamera* Camera;
 CModel* Sphere;
 CModel* Teapot;
-
+CModel* Troll;
 
 
 // Light data - stored manually as there is no light class
@@ -63,8 +64,8 @@ float SpecularPower = 256.0f;
 
 // changing lights variables
 
-D3DXVECTOR3 cLight1Colour = D3DXVECTOR3(1.0f, 0.0f, 0.7f);
-D3DXVECTOR3 cLight2Colour = D3DXVECTOR3(1.0f, 0.8f, 0.2f);
+D3DXVECTOR3 cLight1Colour = D3DXVECTOR3(1.0f, 0.0f, 0.7f) * 10;
+D3DXVECTOR3 cLight2Colour = D3DXVECTOR3(1.0f, 0.8f, 0.2f) * 40;
 
 
 // Display models where the lights are. One of the lights will follow an orbit
@@ -100,26 +101,33 @@ bool InitScene()
 	// Load/Create models
 
 	Cube = new CModel;
+	Cube2 = new CModel;
 	Sphere = new CModel;
 	Floor = new CModel;
 	Teapot = new CModel;
+	Troll = new CModel;
 	Light1 = new CModel;
 	Light2 = new CModel;
 
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
-	if (!Cube->  Load( "Cube.x", VertexTexTechnique)) return false;
+	if (!Cube->  Load( "Cube.x", VertexChangingTexTechnique)) return false;
+	if (!Cube2->Load("Cube.x", NormalMappingTechnique, true)) return false;
 	if (!Sphere->Load("Sphere.x", VertexChangingTexTechnique)) return false;
 	if (!Teapot->Load("Teapot.x", VertexLitTexTechnique)) return false;
+	if (!Troll->Load("Troll.x", VertexLitTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
 
 	// Initial positions
 	Cube->SetPosition( D3DXVECTOR3(0, 10, 0) );
+	Cube2->SetPosition(D3DXVECTOR3(-20, 10, 50));
 	Sphere->SetPosition(D3DXVECTOR3(30, 20, 50));
 	Sphere->SetScale(0.5f);
 	Teapot->SetPosition(D3DXVECTOR3(0, 10, 40));
+	Troll->SetPosition(D3DXVECTOR3(-10, 10, 50));
+	Troll->SetScale(5.0f);
 	Light1->SetPosition( D3DXVECTOR3(30, 10, 0) );
 	Light1->SetScale( 0.1f ); // Nice if size of light reflects its brightness
 	Light2->SetPosition( D3DXVECTOR3(-20, 30, 50) );
@@ -137,6 +145,12 @@ bool InitScene()
 		return false;
 	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"PalletA.dds", NULL, NULL, &TeapotDiffuseMap, NULL)))
 		return false;
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"Troll1DiffuseSpecular.dds", NULL, NULL, &TrollDiffuseMap, NULL)))
+		return false;
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"PatternDiffuseSpecular.dds", NULL, NULL, &Cube2DiffuseMap, NULL)))
+		return false;
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"PatternNormal.dds", NULL, NULL, &Cube2NormalMap, NULL))) 
+		return false;
 
 	return true;
 }
@@ -153,8 +167,8 @@ void UpdateScene( float frameTime )
 	// Control cube position and update its world matrix each frame
 	Cube->Control( frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma );
 	Cube->UpdateMatrix();
-
-	
+	//Cube2->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
+	Cube2->UpdateMatrix();
 
 	// Update the orbiting light - a bit of a cheat with the static variable [ask the tutor if you want to know what this is]
 	static float Rotate = 0.0f;
@@ -173,7 +187,7 @@ void UpdateScene( float frameTime )
 
 	Teapot->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
 	Teapot->UpdateMatrix();
-
+	Troll->UpdateMatrix();
 	int runtimeInt = static_cast<int>(runtimeFloat);
 
 	// Light 2, gradualy changing blue value in Light 2
@@ -219,8 +233,13 @@ void RenderScene()
 	// Render cube
 	WorldMatrixVar->SetMatrix( (float*)Cube->GetWorldMatrix() );  // Send the cube's world matrix to the shader
     DiffuseMapVar->SetResource( CubeDiffuseMap );                 // Send the cube's diffuse/specular map to the shader
-	ModelColourVar->SetRawValue( Blue, 0, 12 );           // Set a single colour to render the model
+	//ModelColourVar->SetRawValue( Blue, 0, 12 );           // Set a single colour to render the model
 	Cube->Render(VertexTexTechnique);                         // Pass rendering technique to the model class
+
+	WorldMatrixVar->SetMatrix((float*)Cube2->GetWorldMatrix());
+	DiffuseMapVar->SetResource(Cube2DiffuseMap);
+	NormalMapVar->SetResource(Cube2NormalMap);               // Send the cube's normal map to the shader
+	Cube2->Render(NormalMappingTechnique);
 
 	WorldMatrixVar->SetMatrix((float*)Sphere->GetWorldMatrix());
 	DiffuseMapVar->SetResource(SphereDiffuseMap);
@@ -229,6 +248,10 @@ void RenderScene()
 	WorldMatrixVar->SetMatrix((float*)Teapot->GetWorldMatrix());
 	DiffuseMapVar->SetResource(TeapotDiffuseMap);
 	Teapot->Render(VertexLitTexTechnique);
+
+	WorldMatrixVar->SetMatrix((float*)Troll->GetWorldMatrix());
+	DiffuseMapVar->SetResource(TrollDiffuseMap);
+	Troll->Render(VertexLitTexTechnique);
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );
@@ -260,7 +283,9 @@ void ReleaseResources()
 	delete Light1;
 	delete Floor;
 	delete Cube;
+	delete Cube2;
 	delete Sphere;
 	delete Teapot;
+	delete Troll;
 	delete Camera;
 }

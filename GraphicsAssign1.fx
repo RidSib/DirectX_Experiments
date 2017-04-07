@@ -19,6 +19,14 @@ struct VS_BASIC_INPUT
 	float2 UV     : TEXCOORD0;
 };
 
+struct VS_NORMALMAP_INPUT
+{
+	float3 Pos     : POSITION;
+	float3 Normal  : NORMAL;
+	float3 Tangent : TANGENT;
+	float2 UV      : TEXCOORD0;
+};
+
 // Data output from vertex shader to pixel shader for simple techniques. Again different techniques have different requirements
 struct VS_BASIC_OUTPUT
 {
@@ -32,6 +40,15 @@ struct VS_LIGHTING_OUTPUT
 	float3 WorldPos    : POSITION;
 	float3 WorldNormal : NORMAL;
 	float2 UV          : TEXCOORD0;
+};
+
+struct VS_NORMALMAP_OUTPUT
+{
+	float4 ProjPos      : SV_POSITION;
+	float3 WorldPos     : POSITION;
+	float3 ModelNormal  : NORMAL;
+	float3 ModelTangent : TANGENT;
+	float2 UV           : TEXCOORD0;
 };
 
 //--------------------------------------------------------------------------------------
@@ -52,6 +69,9 @@ float3 Light2Colour;
 float3 AmbientColour;
 float  SpecularPower;
 float3 CameraPos;
+
+// Normal map
+Texture2D NormalMap;
 
 // multiplier for sphere colour. changes over time
 float colourMulti;
@@ -113,6 +133,28 @@ VS_LIGHTING_OUTPUT VertexLightingTex(VS_BASIC_INPUT vIn)
 	return vOut;
 }
 
+VS_NORMALMAP_OUTPUT NormalMapTransform(VS_NORMALMAP_INPUT vIn)
+{
+	VS_NORMALMAP_OUTPUT vOut;
+
+	// Use world matrix passed from C++ to transform the input model vertex position into world space
+	float4 modelPos = float4(vIn.Pos, 1.0f); // Promote to 1x4 so we can multiply by 4x4 matrix, put 1.0 in 4th element for a point (0.0 for a vector)
+	float4 worldPos = mul(modelPos, WorldMatrix);
+	vOut.WorldPos = worldPos.xyz;
+
+	// Use camera matrices to further transform the vertex from world space into view space (camera's point of view) and finally into 2D "projection" space for rendering
+	float4 viewPos = mul(worldPos, ViewMatrix);
+	vOut.ProjPos = mul(viewPos, ProjMatrix);
+
+	// Just send the model's normal and tangent untransformed (in model space). The pixel shader will do the matrix work on normals
+	vOut.ModelNormal = vIn.Normal;
+	vOut.ModelTangent = vIn.Tangent;
+
+	// Pass texture coordinates (UVs) on to the pixel shader, the vertex shader doesn't need them
+	vOut.UV = vIn.UV;
+
+	return vOut;
+}
 //--------------------------------------------------------------------------------------
 // Pixel Shaders
 //--------------------------------------------------------------------------------------
@@ -172,11 +214,11 @@ float4 VertexLitDiffuseMap(VS_LIGHTING_OUTPUT vOut) : SV_Target  // The ": SV_Ta
 	//// LIGHT 2
 	float3 Light2Dir = normalize(Light2Pos - vOut.WorldPos.xyz);
 	float Light2Dist = length(Light2Pos - vOut.WorldPos.xyz);
-	float3 DiffuseLight2 = (Light2Colour * saturate(dot(worldNormal.xyz, Light2Dir))); // / Light2Dist;
+	float3 DiffuseLight2 = (Light2Colour * saturate(dot(worldNormal.xyz, Light2Dir))) / Light2Dist;
 	halfway = normalize(Light2Dir + CameraDir);
-	float3 SpecularLight2 = DiffuseLight2 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
+	//float3 SpecularLight2 = DiffuseLight2 * pow(saturate( dot(worldNormal.xyz, halfway)), SpecularPower );
 	// attenuation
-	//float3 SpecularLight2 = (Light2Colour / Light2Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
+	float3 SpecularLight2 = (Light2Colour / Light2Dist) * pow(saturate(dot(worldNormal.xyz, halfway)), SpecularPower);
 
 	// Sum the effect of the two lights - add the ambient at this stage rather than for each light (or we will get twice the ambient level)
 	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
@@ -204,6 +246,96 @@ float4 VertexLitDiffuseMap(VS_LIGHTING_OUTPUT vOut) : SV_Target  // The ": SV_Ta
 	return combinedColour;
 }
 
+float4 NormalMapLighting(VS_NORMALMAP_OUTPUT vOut) : SV_Target
+{
+	float3 modelNormal = normalize(vOut.ModelNormal);
+	float3 modelTangent = normalize(vOut.ModelTangent);
+
+	float3 modelBiTangent = cross(modelNormal, modelTangent);
+	float3x3 invTangentMatrix = float3x3(modelTangent, modelBiTangent, modelNormal);
+
+	float3 textureNormal = 2.0f * NormalMap.Sample(Trilinear, vOut.UV) - 1.0f;
+
+	float3 worldNormal = normalize(mul(mul(textureNormal, invTangentMatrix), WorldMatrix));
+
+	///////////////////////
+	// Calculate lighting
+
+	// Calculate direction of camera
+	float3 CameraDir = normalize(CameraPos - vOut.WorldPos.xyz); // Position of camera - position of current vertex (or pixel) (in world space)
+
+																 //// LIGHT 1
+	float3 Light1Dir = normalize(Light1Pos - vOut.WorldPos.xyz);   // Direction for each light is different
+	float3 Light1Dist = length(Light1Pos - vOut.WorldPos.xyz);
+	float3 DiffuseLight1 = Light1Colour * max(dot(worldNormal.xyz, Light1Dir), 0) / Light1Dist;
+	float3 halfway = normalize(Light1Dir + CameraDir);
+	float3 SpecularLight1 = DiffuseLight1 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
+
+	//// LIGHT 2
+	float3 Light2Dir = normalize(Light2Pos - vOut.WorldPos.xyz);
+	float3 Light2Dist = length(Light2Pos - vOut.WorldPos.xyz);
+	float3 DiffuseLight2 = Light2Colour * max(dot(worldNormal.xyz, Light2Dir), 0) / Light2Dist;
+	halfway = normalize(Light2Dir + CameraDir);
+	float3 SpecularLight2 = DiffuseLight2 * pow(max(dot(worldNormal.xyz, halfway), 0), SpecularPower);
+
+	// Sum the effect of the two lights - add the ambient at this stage rather than for each light (or we will get twice the ambient level)
+	float3 DiffuseLight = AmbientColour + DiffuseLight1 + DiffuseLight2;
+	float3 SpecularLight = SpecularLight1 + SpecularLight2;
+
+
+	////////////////////
+	// Sample texture
+
+	// Extract diffuse material colour for this pixel from a texture (using float3, so we get RGB - i.e. ignore any alpha in the texture)
+	float4 DiffuseMaterial = DiffuseMap.Sample(Trilinear, vOut.UV);
+
+	// Assume specular material colour is white (i.e. highlights are a full, untinted reflection of light)
+	float3 SpecularMaterial = DiffuseMaterial.a;
+
+
+	////////////////////
+	// Combine colours 
+
+	// Combine maps and lighting for final pixel colour
+	float4 combinedColour;
+	combinedColour.rgb = DiffuseMaterial * DiffuseLight + SpecularMaterial * SpecularLight;
+	combinedColour.a = 1.0f; // No alpha processing in this shader, so just set it to 1
+
+	return combinedColour;
+}
+
+RasterizerState CullNone  // Cull none of the polygons, i.e. show both sides
+{
+	CullMode = None;
+};
+RasterizerState CullBack  // Cull back side of polygon - normal behaviour, only show front of polygons
+{
+	CullMode = Back;
+};
+
+
+DepthStencilState DepthWritesOff // Don't write to the depth buffer - polygons rendered will not obscure other polygons
+{
+	DepthWriteMask = ZERO;
+};
+DepthStencilState DepthWritesOn  // Write to the depth buffer - normal behaviour 
+{
+	DepthWriteMask = ALL;
+};
+
+
+BlendState NoBlending // Switch off blending - pixels will be opaque
+{
+	BlendEnable[0] = FALSE;
+};
+
+BlendState AdditiveBlending // Additive blending is used for lighting effects
+{
+	BlendEnable[0] = TRUE;
+	SrcBlend = ONE;
+	DestBlend = ONE;
+	BlendOp = ADD;
+};
 //--------------------------------------------------------------------------------------
 // Techniques
 //--------------------------------------------------------------------------------------
@@ -248,5 +380,20 @@ technique10 VertexLitTex
 		SetVertexShader(CompileShader(vs_4_0, VertexLightingTex()));
 		SetGeometryShader(NULL);
 		SetPixelShader(CompileShader(ps_4_0, VertexLitDiffuseMap()));
+	}
+}
+
+technique10 NormalMapping
+{
+	pass P0
+	{
+		SetVertexShader(CompileShader(vs_4_0, NormalMapTransform()));
+		SetGeometryShader(NULL);
+		SetPixelShader(CompileShader(ps_4_0, NormalMapLighting()));
+
+		// Switch off blending states
+		SetBlendState(NoBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xFFFFFFFF);
+		SetRasterizerState(CullBack);
+		SetDepthStencilState(DepthWritesOn, 0);
 	}
 }

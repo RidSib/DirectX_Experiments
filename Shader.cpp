@@ -9,7 +9,7 @@ ID3D10EffectTechnique* PlainColourTechnique = NULL;
 ID3D10EffectTechnique* VertexTexTechnique = NULL;
 ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
 ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
-
+ID3D10EffectTechnique* NormalMappingTechnique = NULL;
 // Light Effect variables
 ID3D10EffectVectorVariable* g_pCameraPosVar = NULL;
 ID3D10EffectVectorVariable* g_pLightPosVar = NULL;
@@ -33,12 +33,14 @@ ID3D10ShaderResourceView* CubeDiffuseMap = NULL;
 ID3D10ShaderResourceView* FloorDiffuseMap = NULL;
 ID3D10ShaderResourceView* SphereDiffuseMap = NULL;
 ID3D10ShaderResourceView* TeapotDiffuseMap = NULL;
-
-
+ID3D10ShaderResourceView* TrollDiffuseMap = NULL;
+ID3D10ShaderResourceView* Cube2DiffuseMap = NULL;
+ID3D10ShaderResourceView* Cube2NormalMap = NULL;
 // Miscellaneous
 ID3D10EffectVectorVariable* ModelColourVar = NULL;
 
 ID3D10EffectShaderResourceVariable* DiffuseMapVar = NULL;
+ID3D10EffectShaderResourceVariable* NormalMapVar = NULL;
 
 //--------------------------------------------------------------------------------------
 // Load and compile Effect file (.fx file containing shaders)
@@ -66,6 +68,8 @@ bool LoadEffectFile()
 	VertexTexTechnique = Effect->GetTechniqueByName("VertexTex");
 	VertexChangingTexTechnique = Effect->GetTechniqueByName("VertexChangingTex");
 	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
+	NormalMappingTechnique = Effect->GetTechniqueByName("NormalMapping");
+
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar = Effect->GetVariableByName("WorldMatrix")->AsMatrix();
 	ViewMatrixVar = Effect->GetVariableByName("ViewMatrix")->AsMatrix();
@@ -89,7 +93,7 @@ bool LoadEffectFile()
 	g_pLight2ColourVar = Effect->GetVariableByName("Light2Colour")->AsVector();
 	g_pAmbientColourVar = Effect->GetVariableByName("AmbientColour")->AsVector();
 	g_pSpecularPowerVar = Effect->GetVariableByName("SpecularPower")->AsScalar();
-
+	NormalMapVar = Effect->GetVariableByName("NormalMap")->AsShaderResource();
 
 	return true;
 }
@@ -100,8 +104,11 @@ void ReleaseShaders()
 
 	if (FloorDiffuseMap)  FloorDiffuseMap->Release();
 	if (CubeDiffuseMap)   CubeDiffuseMap->Release();
+	if (Cube2DiffuseMap)   Cube2DiffuseMap->Release();
+	if (Cube2NormalMap)   Cube2NormalMap->Release();
 	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
 	if (TeapotDiffuseMap)  TeapotDiffuseMap->Release();
+	if (TrollDiffuseMap)  TrollDiffuseMap->Release();
 	if (Effect)           Effect->Release();
 	if (DepthStencilView) DepthStencilView->Release();
 	if (RenderTargetView) RenderTargetView->Release();

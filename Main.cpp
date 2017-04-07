@@ -9,7 +9,8 @@
 #include "resource.h"
 #include "CTimer.h" // Timer class - not DirectX
 #include "Input.h"  // Input functions - not DirectX
-
+#include "Shader.h"
+#include "Device.h"
 //--------------------------------------------------------------------------------------
 // Global Variables
 //--------------------------------------------------------------------------------------
@@ -51,6 +52,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	if (!InitDevice(g_hWnd) || !LoadEffectFile() || !InitScene())
 	{
 		ReleaseResources();
+		ReleaseShaders();
+		ReleaseDevice();
 		return 0;
 	}
 

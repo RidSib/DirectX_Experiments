@@ -9,7 +9,7 @@ extern ID3D10EffectTechnique* PlainColourTechnique;
 extern ID3D10EffectTechnique* VertexTexTechnique;
 extern ID3D10EffectTechnique* VertexChangingTexTechnique;
 extern ID3D10EffectTechnique* VertexLitTexTechnique;
-
+extern ID3D10EffectTechnique* NormalMappingTechnique;
 // Light Effect variables
 extern ID3D10EffectVectorVariable* g_pCameraPosVar;
 extern ID3D10EffectVectorVariable* g_pLightPosVar;
@@ -33,12 +33,15 @@ extern ID3D10ShaderResourceView* CubeDiffuseMap;
 extern ID3D10ShaderResourceView* FloorDiffuseMap;
 extern ID3D10ShaderResourceView* SphereDiffuseMap;
 extern ID3D10ShaderResourceView* TeapotDiffuseMap;
-
+extern ID3D10ShaderResourceView* TrollDiffuseMap;
+extern ID3D10ShaderResourceView* Cube2DiffuseMap;
+extern ID3D10ShaderResourceView* Cube2NormalMap;
 
 // Miscellaneous
 extern ID3D10EffectVectorVariable* ModelColourVar;
 
 extern ID3D10EffectShaderResourceVariable* DiffuseMapVar;
+extern ID3D10EffectShaderResourceVariable* NormalMapVar;
 
 // Initialise shaders - load an effect file (.fx file containing shaders)
 bool LoadEffectFile();
