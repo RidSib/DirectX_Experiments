@@ -77,6 +77,7 @@ const float LightOrbitSpeed  = 0.5f;
 // Effects / techniques
 ID3D10Effect*          Effect = NULL;
 ID3D10EffectTechnique* PlainColourTechnique = NULL;
+ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
 
 // Matrices
 ID3D10EffectMatrixVariable* WorldMatrixVar = NULL;
@@ -251,6 +252,7 @@ bool LoadEffectFile()
 
 	// Now we can select techniques from the compiled effect file
 	PlainColourTechnique = Effect->GetTechniqueByName( "PlainColour" );
+	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
 
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar    = Effect->GetVariableByName( "WorldMatrix" )->AsMatrix();
@@ -294,7 +296,7 @@ bool InitScene()
 
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
-	if (!Cube->  Load( "Cube.x",  PlainColourTechnique )) return false;
+	if (!Cube->  Load( "Cube.x", VertexLitTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", PlainColourTechnique )) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
@@ -372,7 +374,7 @@ void RenderScene()
 	WorldMatrixVar->SetMatrix( (float*)Cube->GetWorldMatrix() );  // Send the cube's world matrix to the shader
     DiffuseMapVar->SetResource( CubeDiffuseMap );                 // Send the cube's diffuse/specular map to the shader
 	ModelColourVar->SetRawValue( Blue, 0, 12 );           // Set a single colour to render the model
-	Cube->Render( PlainColourTechnique );                         // Pass rendering technique to the model class
+	Cube->Render(VertexLitTexTechnique);                         // Pass rendering technique to the model class
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );
