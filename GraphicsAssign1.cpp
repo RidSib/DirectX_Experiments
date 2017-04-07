@@ -387,22 +387,21 @@ void UpdateScene( float frameTime )
 	// Second light doesn't move, but do need to make sure its matrix has been calculated - could do this in InitScene instead
 	Light2->UpdateMatrix();
 
-	// Sphere brightness calculation
+	// Sphere brightness/colour calculation
 	float static runtime = 0.0f;
 	runtime += frameTime;
-	float x = fmod(runtime,5);
 	colourMultiVar->SetFloat(fmod(runtime, 5)*0.2f);
 	Sphere->UpdateMatrix();
 
 	Teapot->UpdateMatrix();
-	g_pLightPosVar->SetRawValue(LightPosition, 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
-	g_pLightColourVar->SetRawValue(LightColour, 0, 12);
+
+	g_pLightPosVar->SetRawValue(Light1->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
+	g_pLightColourVar->SetRawValue(Light1Colour, 0, 12);
+	g_pLight2PosVar->SetRawValue(Light2->GetPosition(), 0, 12);
+	g_pLight2ColourVar->SetRawValue(Light2Colour, 0, 12);
 	g_pAmbientColourVar->SetRawValue(AmbientColour, 0, 12);
 	g_pSpecularPowerVar->SetFloat(SpecularPower);
-	g_pCameraPosVar->SetRawValue(CameraPosition, 0, 12);
-
-	g_pLight2PosVar->SetRawValue(LightPosition2, 0, 12);
-	g_pLight2ColourVar->SetRawValue(LightColour2, 0, 12);
+	g_pCameraPosVar->SetRawValue(Camera->GetPosition(), 0, 12);
 }
 
 
