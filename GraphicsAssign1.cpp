@@ -80,6 +80,7 @@ const float LightOrbitSpeed  = 0.5f;
 ID3D10Effect*          Effect = NULL;
 ID3D10EffectTechnique* PlainColourTechnique = NULL;
 ID3D10EffectTechnique* VertexTexTechnique = NULL;
+ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
 
 // Matrices
 ID3D10EffectMatrixVariable* WorldMatrixVar = NULL;
@@ -87,6 +88,8 @@ ID3D10EffectMatrixVariable* ViewMatrixVar = NULL;
 ID3D10EffectMatrixVariable* ProjMatrixVar = NULL;
 ID3D10EffectMatrixVariable* ViewProjMatrixVar = NULL;
 
+// Variables
+ID3D10EffectScalarVariable* colourMultiVar = NULL;
 // Textures
 ID3D10EffectShaderResourceVariable* DiffuseMapVar = NULL;
 
@@ -257,7 +260,7 @@ bool LoadEffectFile()
 	// Now we can select techniques from the compiled effect file
 	PlainColourTechnique = Effect->GetTechniqueByName( "PlainColour" );
 	VertexTexTechnique = Effect->GetTechniqueByName("VertexTex");
-
+	VertexChangingTexTechnique = Effect->GetTechniqueByName("VertexChangingTex");
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar    = Effect->GetVariableByName( "WorldMatrix" )->AsMatrix();
 	ViewMatrixVar     = Effect->GetVariableByName( "ViewMatrix"  )->AsMatrix();
@@ -270,6 +273,8 @@ bool LoadEffectFile()
 	// Other shader variables
 	ModelColourVar = Effect->GetVariableByName( "ModelColour"  )->AsVector();
 
+	// Other variables
+	colourMultiVar = Effect->GetVariableByName("colourMulti")->AsScalar();
 	return true;
 }
 
@@ -302,7 +307,7 @@ bool InitScene()
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
 	if (!Cube->  Load( "Cube.x", VertexTexTechnique)) return false;
-	if (!Sphere->Load("Sphere.x", VertexTexTechnique)) return false;
+	if (!Sphere->Load("Sphere.x", VertexChangingTexTechnique)) return false;
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
@@ -343,7 +348,7 @@ void UpdateScene( float frameTime )
 	Cube->Control( frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma );
 	Cube->UpdateMatrix();
 
-	Sphere->UpdateMatrix();
+	
 
 	// Update the orbiting light - a bit of a cheat with the static variable [ask the tutor if you want to know what this is]
 	static float Rotate = 0.0f;
@@ -353,6 +358,13 @@ void UpdateScene( float frameTime )
 
 	// Second light doesn't move, but do need to make sure its matrix has been calculated - could do this in InitScene instead
 	Light2->UpdateMatrix();
+
+	// Sphere brightness calculation
+	float static runtime = 0.0f;
+	runtime += frameTime;
+	float x = fmod(runtime,5);
+	colourMultiVar->SetFloat(fmod(runtime, 5)*0.2f);
+	Sphere->UpdateMatrix();
 }
 
 
@@ -391,7 +403,7 @@ void RenderScene()
 	WorldMatrixVar->SetMatrix((float*)Sphere->GetWorldMatrix());
 	DiffuseMapVar->SetResource(SphereDiffuseMap);
 	ModelColourVar->SetRawValue(Blue, 0, 12);
-	Sphere->Render(VertexTexTechnique);
+	Sphere->Render(VertexChangingTexTechnique);
 
 	// Same for the other models in the scene
 	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );

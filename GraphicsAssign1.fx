@@ -37,6 +37,9 @@ float4x4 WorldMatrix;
 float4x4 ViewMatrix;
 float4x4 ProjMatrix;
 
+// multiplier for sphere colour. changes over time
+float colourMulti;
+
 // A single colour for an entire model - used for light models and the intial basic shader
 float3 ModelColour;
 
@@ -94,6 +97,17 @@ float4 SimplePixelShader(VS_BASIC_OUTPUT vOut) : SV_Target  // The ": SV_Target"
 	return colour;
 }
 
+float4 SimpleChangingPixelShader(VS_BASIC_OUTPUT vOut) : SV_Target  // The ": SV_Target" bit just indicates that the returned float4 colour goes to the render target (i.e. it's a colour to render)
+{
+	float3 TexColour = DiffuseMap.Sample(Trilinear, vOut.UV);
+	float4 colour = 1;
+	colour.r = TexColour.r + colourMulti;
+	colour.g = TexColour.g + colourMulti;
+	colour.b = TexColour.b + colourMulti;
+	colour.a = 0.0f;
+	return colour;
+}
+
 //--------------------------------------------------------------------------------------
 // Techniques
 //--------------------------------------------------------------------------------------
@@ -118,5 +132,15 @@ technique10 VertexTex
 		SetVertexShader(CompileShader(vs_4_0, BasicTransform()));
 		SetGeometryShader(NULL);
 		SetPixelShader(CompileShader(ps_4_0, SimplePixelShader()));
+	}
+}
+
+technique10 VertexChangingTex
+{
+	pass P0
+	{
+		SetVertexShader(CompileShader(vs_4_0, BasicTransform()));
+		SetGeometryShader(NULL);
+		SetPixelShader(CompileShader(ps_4_0, SimpleChangingPixelShader()));
 	}
 }
