@@ -395,6 +395,22 @@ BlendState AdditiveBlending // Additive blending is used for lighting effects
 	DestBlend = ONE;
 	BlendOp = ADD;
 };
+
+BlendState MultiBlending
+{
+	BlendEnable[0] = TRUE;
+	SrcBlend = DEST_COLOR;
+	DestBlend = ZERO;
+	BlendOp = ADD;
+};
+
+BlendState AlphaBlending
+{
+	BlendEnable[0] = TRUE;
+	SrcBlend = SRC_ALPHA;
+	DestBlend = INV_SRC_ALPHA;
+	BlendOp = ADD;
+};
 //--------------------------------------------------------------------------------------
 // Techniques
 //--------------------------------------------------------------------------------------
@@ -466,6 +482,20 @@ technique10 NormalMappingPara
 		SetPixelShader(CompileShader(ps_4_0, NormalMapLightingPara()));
 
 		// Switch off blending states
+		SetBlendState(NoBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xFFFFFFFF);
+		SetRasterizerState(CullBack);
+		SetDepthStencilState(DepthWritesOn, 0);
+	}
+}
+
+technique10 AdditiveBlendingTech
+{
+	pass P0
+	{
+		SetVertexShader(CompileShader(vs_4_0, BasicTransform()));
+		SetGeometryShader(NULL);
+		SetPixelShader(CompileShader(ps_4_0, SimplePixelShader()));
+
 		SetBlendState(NoBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xFFFFFFFF);
 		SetRasterizerState(CullBack);
 		SetDepthStencilState(DepthWritesOn, 0);

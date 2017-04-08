@@ -54,6 +54,7 @@ CCamera* Camera;
 CModel* Sphere;
 CModel* Teapot;
 CModel* Teapot2;
+CModel* Car;
 //CModel* Troll;
 
 
@@ -111,7 +112,7 @@ bool InitScene()
 	//Troll = new CModel;
 	Light1 = new CModel;
 	Light2 = new CModel;
-
+	Car = new CModel;
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
 	if (!Cube->  Load( "Cube.x", VertexChangingTexTechnique)) return false;
@@ -123,6 +124,7 @@ bool InitScene()
 	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
 	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
 	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
+	if (!Car->Load("AstonMartin.x", AdditiveBlendingTechnique)) return false;
 
 	// Initial positions
 	Cube->SetPosition( D3DXVECTOR3(0, 10, 0) );
@@ -133,6 +135,8 @@ bool InitScene()
 	Teapot2->SetPosition(D3DXVECTOR3(0, 20, 40));
 	//Troll->SetPosition(D3DXVECTOR3(-10, 10, 50));
 	//Troll->SetScale(5.0f);
+	Car->SetPosition(D3DXVECTOR3(20, 10, 30));
+	Car->SetScale(3.0f);
 	Light1->SetPosition( D3DXVECTOR3(30, 10, 0) );
 	Light1->SetScale( 0.1f ); // Nice if size of light reflects its brightness
 	Light2->SetPosition( D3DXVECTOR3(-20, 30, 50) );
@@ -160,6 +164,8 @@ bool InitScene()
 		return false;
 	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"WallNormalDepth.dds", NULL, NULL, &Teapot2NormalMap, NULL)))
 		return false;
+	if (FAILED(D3DX10CreateShaderResourceViewFromFile(g_pd3dDevice, L"StoneDiffuseSpecular.dds", NULL, NULL, &CarDiffuseMap, NULL)))
+		return false;
 
 	return true;
 }
@@ -178,7 +184,7 @@ void UpdateScene( float frameTime )
 	Cube->UpdateMatrix();
 	//Cube2->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
 	Cube2->UpdateMatrix();
-
+	Car->UpdateMatrix();
 	// Update the orbiting light - a bit of a cheat with the static variable [ask the tutor if you want to know what this is]
 	static float Rotate = 0.0f;
 	Light1->SetPosition( Cube->GetPosition() + D3DXVECTOR3(cos(Rotate)*LightOrbitRadius, 0, sin(Rotate)*LightOrbitRadius) );
@@ -264,6 +270,10 @@ void RenderScene()
 	NormalMapVar->SetResource(Teapot2NormalMap);
 	Teapot2->Render(NormalMappingParaTechnique);
 
+	WorldMatrixVar->SetMatrix((float*)Car->GetWorldMatrix());
+	DiffuseMapVar->SetResource(CarDiffuseMap);
+	Car->Render(AdditiveBlendingTechnique);
+
 	//WorldMatrixVar->SetMatrix((float*)Troll->GetWorldMatrix());
 	//DiffuseMapVar->SetResource(TrollDiffuseMap);
 	//Troll->Render(VertexLitTexTechnique);
@@ -299,6 +309,7 @@ void ReleaseResources()
 	delete Floor;
 	delete Cube;
 	delete Cube2;
+	delete Car;
 	delete Sphere;
 	delete Teapot;
 	//delete Troll;

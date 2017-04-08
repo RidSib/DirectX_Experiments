@@ -11,6 +11,7 @@ extern ID3D10EffectTechnique* VertexChangingTexTechnique;
 extern ID3D10EffectTechnique* VertexLitTexTechnique;
 extern ID3D10EffectTechnique* NormalMappingTechnique;
 extern ID3D10EffectTechnique* NormalMappingParaTechnique;
+extern ID3D10EffectTechnique* AdditiveBlendingTechnique;
 // Light Effect variables
 extern ID3D10EffectVectorVariable* g_pCameraPosVar;
 extern ID3D10EffectVectorVariable* g_pLightPosVar;
@@ -40,6 +41,7 @@ extern ID3D10ShaderResourceView* Cube2DiffuseMap;
 extern ID3D10ShaderResourceView* Cube2NormalMap;
 extern ID3D10ShaderResourceView* Teapot2DiffuseMap;
 extern ID3D10ShaderResourceView* Teapot2NormalMap;
+extern ID3D10ShaderResourceView* CarDiffuseMap;
 
 // Miscellaneous
 extern ID3D10EffectVectorVariable* ModelColourVar;

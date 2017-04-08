@@ -11,6 +11,7 @@ ID3D10EffectTechnique* VertexChangingTexTechnique = NULL;
 ID3D10EffectTechnique* VertexLitTexTechnique = NULL;
 ID3D10EffectTechnique* NormalMappingTechnique = NULL;
 ID3D10EffectTechnique* NormalMappingParaTechnique = NULL;
+ID3D10EffectTechnique* AdditiveBlendingTechnique = NULL;
 
 // Light Effect variables
 ID3D10EffectVectorVariable* g_pCameraPosVar = NULL;
@@ -41,6 +42,7 @@ ID3D10ShaderResourceView* Cube2DiffuseMap = NULL;
 ID3D10ShaderResourceView* Cube2NormalMap = NULL;
 ID3D10ShaderResourceView* Teapot2DiffuseMap = NULL;
 ID3D10ShaderResourceView* Teapot2NormalMap = NULL;
+ID3D10ShaderResourceView* CarDiffuseMap = NULL;
 
 // Miscellaneous
 ID3D10EffectVectorVariable* ModelColourVar = NULL;
@@ -76,6 +78,7 @@ bool LoadEffectFile()
 	VertexLitTexTechnique = Effect->GetTechniqueByName("VertexLitTex");
 	NormalMappingTechnique = Effect->GetTechniqueByName("NormalMapping");
 	NormalMappingParaTechnique = Effect->GetTechniqueByName("NormalMappingPara");
+	AdditiveBlendingTechnique = Effect->GetTechniqueByName("AdditiveBlendingTech");
 
 	// Create special variables to allow us to access global variables in the shaders from C++
 	WorldMatrixVar = Effect->GetVariableByName("WorldMatrix")->AsMatrix();
@@ -116,6 +119,7 @@ void ReleaseShaders()
 	if (Cube2NormalMap)   Cube2NormalMap->Release();
 	if (Teapot2DiffuseMap)   Teapot2DiffuseMap->Release();
 	if (Teapot2NormalMap)   Teapot2NormalMap->Release();
+	if (CarDiffuseMap)   CarDiffuseMap->Release();
 	if (SphereDiffuseMap)  SphereDiffuseMap->Release();
 	if (TeapotDiffuseMap)  TeapotDiffuseMap->Release();
 	if (TrollDiffuseMap)  TrollDiffuseMap->Release();
