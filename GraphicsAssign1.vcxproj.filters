@@ -55,6 +55,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="Device.cpp" />
+    <ClCompile Include="Light.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Resource.h">
@@ -128,6 +129,7 @@
     </ClInclude>
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Device.h" />
+    <ClInclude Include="Light.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="GraphicsAssign1.fx" />

@@ -30,6 +30,7 @@
 #include <d3d10.h>
 #include <d3dx10.h>
 #include <atlbase.h>
+#include <map>
 #include "resource.h"
 
 #include "Defines.h" // General definitions shared by all source files
@@ -38,7 +39,7 @@
 #include "Camera.h"  // Camera class - encapsulates the camera's view and projection matrix
 #include "Shader.h"
 #include "Input.h"   // Input functions - not DirectX
-
+#include "Light.h"
 
 //--------------------------------------------------------------------------------------
 // Global Scene Variables
@@ -47,33 +48,20 @@
 // Models and cameras encapsulated in classes for flexibity and convenience
 // The CModel class collects together geometry and world matrix, and provides functions to control the model and render it
 // The CCamera class handles the view and projections matrice, and provides functions to control the camera
-CModel* Cube;
-CModel* Cube2;
-CModel* Floor;
-CCamera* Camera;
-CModel* Sphere;
-CModel* Teapot;
-CModel* Teapot2;
-CModel* Car;
-//CModel* Troll;
 
+CCamera* Camera;
+map<string, CModel*> models;
+map<int, Light*> lights;
 
 // Light data - stored manually as there is no light class
-D3DXVECTOR3 Light1Colour = D3DXVECTOR3( 1.0f, 0.0f, 0.7f ) * 10;
-D3DXVECTOR3 Light2Colour = D3DXVECTOR3( 1.0f, 0.8f, 0.2f ) * 40;
 D3DXVECTOR3 AmbientColour = D3DXVECTOR3( 0.2f, 0.2f, 0.2f );
 float SpecularPower = 256.0f;
 float ParallaxDepth = 0.08f; // Overall depth of bumpiness for parallax mapping
 
 // changing lights variables
 
-D3DXVECTOR3 cLight1Colour = D3DXVECTOR3(1.0f, 0.0f, 0.7f);
-D3DXVECTOR3 cLight2Colour = D3DXVECTOR3(1.0f, 0.8f, 0.2f);
-
 
 // Display models where the lights are. One of the lights will follow an orbit
-CModel* Light1;
-CModel* Light2;
 const float LightOrbitRadius = 20.0f;
 const float LightOrbitSpeed  = 0.5f;
 
@@ -102,45 +90,47 @@ bool InitScene()
 
 	///////////////////////
 	// Load/Create models
-
-	Cube = new CModel;
-	Cube2 = new CModel;
-	Sphere = new CModel;
-	Floor = new CModel;
-	Teapot = new CModel;
-	Teapot2 = new CModel;
-	//Troll = new CModel;
-	Light1 = new CModel;
-	Light2 = new CModel;
-	Car = new CModel;
+	models["Cube"] = new CModel;
+	models["Cube2"] = new CModel;
+	models["Sphere"] = new CModel;
+	models["Floor"] = new CModel;
+	models["Teapot"] = new CModel;
+	models["Teapot2"] = new CModel;
+	models["Car"] = new CModel;
+	lights[1] = new Light; // starts at 1 instead of 0 to avoid later confusion
+	lights[2] = new Light;
 	// The model class can load ".X" files. It encapsulates (i.e. hides away from this code) the file loading/parsing and creation of vertex/index buffers
 	// We must pass an example technique used for each model. We can then only render models with techniques that uses matching vertex input data
-	if (!Cube->  Load( "Cube.x", VertexChangingTexTechnique)) return false;
-	if (!Cube2->Load("Cube.x", NormalMappingTechnique, true)) return false;
-	if (!Sphere->Load("Sphere.x", VertexChangingTexTechnique)) return false;
-	if (!Teapot->Load("Teapot.x", VertexLitTexTechnique)) return false;
-	if (!Teapot2->Load("Teapot.x", NormalMappingParaTechnique, true)) return false;
+	if (!models["Cube"]->  Load( "Cube.x", VertexChangingTexTechnique)) return false;
+	if (!models["Cube2"]->Load("Cube.x", NormalMappingTechnique, true)) return false;
+	if (!models["Sphere"]->Load("Sphere.x", VertexChangingTexTechnique)) return false;
+	if (!models["Teapot"]->Load("Teapot.x", VertexLitTexTechnique)) return false;
+	if (!models["Teapot2"]->Load("Teapot.x", NormalMappingParaTechnique, true)) return false;
 	//if (!Troll->Load("Troll.x", VertexLitTexTechnique)) return false;
-	if (!Floor-> Load( "Floor.x", VertexTexTechnique)) return false;
-	if (!Light1->Load( "Sphere.x", PlainColourTechnique )) return false;
-	if (!Light2->Load( "Sphere.x", PlainColourTechnique )) return false;
-	if (!Car->Load("AstonMartin.x", AdditiveBlendingTechnique)) return false;
+	if (!models["Floor"]-> Load( "Floor.x", VertexTexTechnique)) return false;
+	if (!lights[1]->Load( "Sphere.x", PlainColourTechnique )) return false;
+	if (!lights[2]->Load( "Sphere.x", PlainColourTechnique )) return false;
+	if (!models["Car"]->Load("AstonMartin.x", AdditiveBlendingTechnique)) return false;
 
+	
+	
 	// Initial positions
-	Cube->SetPosition( D3DXVECTOR3(0, 10, 0) );
-	Cube2->SetPosition(D3DXVECTOR3(-20, 10, 50));
-	Sphere->SetPosition(D3DXVECTOR3(30, 20, 50));
-	Sphere->SetScale(0.5f);
-	Teapot->SetPosition(D3DXVECTOR3(0, 10, 40));
-	Teapot2->SetPosition(D3DXVECTOR3(0, 20, 40));
+	models["Cube"]->SetPosition( D3DXVECTOR3(0, 10, 0) );
+	models["Cube2"]->SetPosition(D3DXVECTOR3(-20, 10, 50));
+	models["Sphere"]->SetPosition(D3DXVECTOR3(30, 20, 50));
+	models["Sphere"]->SetScale(0.5f);
+	models["Teapot"]->SetPosition(D3DXVECTOR3(0, 10, 40));
+	models["Teapot2"]->SetPosition(D3DXVECTOR3(0, 20, 40));
 	//Troll->SetPosition(D3DXVECTOR3(-10, 10, 50));
 	//Troll->SetScale(5.0f);
-	Car->SetPosition(D3DXVECTOR3(20, 10, 30));
-	Car->SetScale(3.0f);
-	Light1->SetPosition( D3DXVECTOR3(30, 10, 0) );
-	Light1->SetScale( 0.1f ); // Nice if size of light reflects its brightness
-	Light2->SetPosition( D3DXVECTOR3(-20, 30, 50) );
-	Light2->SetScale( 0.2f );
+	models["Car"]->SetPosition(D3DXVECTOR3(20, 10, 30));
+	models["Car"]->SetScale(3.0f);
+	lights[1]->SetPosition( D3DXVECTOR3(30, 10, 0) );
+	lights[1]->SetScale( 0.1f ); // Nice if size of light reflects its brightness
+	lights[1]->SetInitColour(D3DXVECTOR3(1.0f, 0.0f, 0.7f) * 10);
+	lights[2]->SetPosition( D3DXVECTOR3(-20, 30, 50) );
+	lights[2]->SetScale( 0.2f );
+	lights[2]->SetInitColour(D3DXVECTOR3(1.0f, 0.8f, 0.2f) * 40);
 
 
 	//////////////////
@@ -180,40 +170,40 @@ void UpdateScene( float frameTime )
 	Camera->UpdateMatrices();
 	
 	// Control cube position and update its world matrix each frame
-	Cube->Control( frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma );
-	Cube->UpdateMatrix();
+	models["Cube"]->Control( frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma );
+	models["Cube"]->UpdateMatrix();
 	//Cube2->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
-	Cube2->UpdateMatrix();
-	Car->UpdateMatrix();
+	models["Cube2"]->UpdateMatrix();
+	models["Car"]->UpdateMatrix();
 	// Update the orbiting light - a bit of a cheat with the static variable [ask the tutor if you want to know what this is]
 	static float Rotate = 0.0f;
-	Light1->SetPosition( Cube->GetPosition() + D3DXVECTOR3(cos(Rotate)*LightOrbitRadius, 0, sin(Rotate)*LightOrbitRadius) );
+	lights[1]->SetPosition(models["Cube"]->GetPosition() + D3DXVECTOR3(cos(Rotate)*LightOrbitRadius, 0, sin(Rotate)*LightOrbitRadius) );
 	Rotate -= LightOrbitSpeed * frameTime;
-	Light1->UpdateMatrix();
+	lights[1]->UpdateMatrix();
 
 	// Second light doesn't move, but do need to make sure its matrix has been calculated - could do this in InitScene instead
-	Light2->UpdateMatrix();
+	lights[2]->UpdateMatrix();
 
 	// Sphere brightness/colour calculation
 	float static runtimeFloat = 0.0f;
 	runtimeFloat += frameTime;
 	colourMultiVar->SetFloat(fmod(runtimeFloat, 5.0f)*0.2f);
-	Sphere->UpdateMatrix();
+	models["Sphere"]->UpdateMatrix();
 
-	Teapot2->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
-	Teapot->UpdateMatrix();
-	Teapot2->UpdateMatrix();
+	models["Teapot2"]->Control(frameTime, Key_I, Key_K, Key_J, Key_L, Key_U, Key_O, Key_Period, Key_Comma);
+	models["Teapot"]->UpdateMatrix();
+	models["Teapot2"]->UpdateMatrix();
 	//Troll->UpdateMatrix();
 	int runtimeInt = static_cast<int>(runtimeFloat);
 
 	// Light 2, gradualy changing blue value in Light 2
 	float belowTwoSec = fmod(runtimeFloat, 2.0f);
-	cLight1Colour = Light1Colour * (runtimeInt % 2);
-	cLight2Colour = D3DXVECTOR3(Light2Colour.x, Light2Colour.y, (belowTwoSec > 1.0f ? 1.0f - (belowTwoSec - 1.0f) : belowTwoSec) * Light2Colour.z);
-	g_pLightPosVar->SetRawValue(Light1->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
-	g_pLightColourVar->SetRawValue(cLight1Colour, 0, 12);
-	g_pLight2PosVar->SetRawValue(Light2->GetPosition(), 0, 12);
-	g_pLight2ColourVar->SetRawValue(cLight2Colour, 0, 12);
+	lights[1]->SetColour(lights[1]->GetInitColour() * (runtimeInt % 2));
+	lights[2]->SetColour(D3DXVECTOR3(lights[2]->GetInitColour().x, lights[2]->GetInitColour().y, (belowTwoSec > 1.0f ? 1.0f - (belowTwoSec - 1.0f) : belowTwoSec) * lights[2]->GetInitColour().z));
+	g_pLightPosVar->SetRawValue(lights[1]->GetPosition(), 0, 12);  // Send 3 floats (12 bytes) from C++ LightPos variable (x,y,z) to shader counterpart (middle parameter is unused) 
+	g_pLightColourVar->SetRawValue(lights[1]->GetColour(), 0, 12);
+	g_pLight2PosVar->SetRawValue(lights[2]->GetPosition(), 0, 12);
+	g_pLight2ColourVar->SetRawValue(lights[2]->GetColour(), 0, 12);
 	g_pAmbientColourVar->SetRawValue(AmbientColour, 0, 12);
 	g_pSpecularPowerVar->SetFloat(SpecularPower);
 	g_pCameraPosVar->SetRawValue(Camera->GetPosition(), 0, 12);
@@ -247,52 +237,52 @@ void RenderScene()
 	D3DXVECTOR3 Blue( 0.0f, 0.0f, 1.0f );
 
 	// Render cube
-	WorldMatrixVar->SetMatrix( (float*)Cube->GetWorldMatrix() );  // Send the cube's world matrix to the shader
+	WorldMatrixVar->SetMatrix( (float*)models["Cube"]->GetWorldMatrix() );  // Send the cube's world matrix to the shader
     DiffuseMapVar->SetResource( CubeDiffuseMap );                 // Send the cube's diffuse/specular map to the shader
 	//ModelColourVar->SetRawValue( Blue, 0, 12 );           // Set a single colour to render the model
-	Cube->Render(VertexTexTechnique);                         // Pass rendering technique to the model class
+	models["Cube"]->Render(VertexTexTechnique);                         // Pass rendering technique to the model class
 
-	WorldMatrixVar->SetMatrix((float*)Cube2->GetWorldMatrix());
+	WorldMatrixVar->SetMatrix((float*)models["Cube2"]->GetWorldMatrix());
 	DiffuseMapVar->SetResource(Cube2DiffuseMap);
 	NormalMapVar->SetResource(Cube2NormalMap);               // Send the cube's normal map to the shader
-	Cube2->Render(NormalMappingTechnique);
+	models["Cube2"]->Render(NormalMappingTechnique);
 
-	WorldMatrixVar->SetMatrix((float*)Sphere->GetWorldMatrix());
+	WorldMatrixVar->SetMatrix((float*)models["Sphere"]->GetWorldMatrix());
 	DiffuseMapVar->SetResource(SphereDiffuseMap);
-	Sphere->Render(VertexChangingTexTechnique);
+	models["Sphere"]->Render(VertexChangingTexTechnique);
 
-	WorldMatrixVar->SetMatrix((float*)Teapot->GetWorldMatrix());
+	WorldMatrixVar->SetMatrix((float*)models["Teapot"]->GetWorldMatrix());
 	DiffuseMapVar->SetResource(TeapotDiffuseMap);
-	Teapot->Render(VertexLitTexTechnique);
+	models["Teapot"]->Render(VertexLitTexTechnique);
 
-	WorldMatrixVar->SetMatrix((float*)Teapot2->GetWorldMatrix());
+	WorldMatrixVar->SetMatrix((float*)models["Teapot2"]->GetWorldMatrix());
 	DiffuseMapVar->SetResource(Teapot2DiffuseMap);
 	NormalMapVar->SetResource(Teapot2NormalMap);
-	Teapot2->Render(NormalMappingParaTechnique);
+	models["Teapot2"]->Render(NormalMappingParaTechnique);
 
-	WorldMatrixVar->SetMatrix((float*)Car->GetWorldMatrix());
+	WorldMatrixVar->SetMatrix((float*)models["Car"]->GetWorldMatrix());
 	DiffuseMapVar->SetResource(CarDiffuseMap);
-	Car->Render(AdditiveBlendingTechnique);
+	models["Car"]->Render(AdditiveBlendingTechnique);
 
 	//WorldMatrixVar->SetMatrix((float*)Troll->GetWorldMatrix());
 	//DiffuseMapVar->SetResource(TrollDiffuseMap);
 	//Troll->Render(VertexLitTexTechnique);
 
 	// Same for the other models in the scene
-	WorldMatrixVar->SetMatrix( (float*)Floor->GetWorldMatrix() );
+	WorldMatrixVar->SetMatrix( (float*)models["Floor"]->GetWorldMatrix() );
     DiffuseMapVar->SetResource( FloorDiffuseMap );
 	ModelColourVar->SetRawValue( Black, 0, 12 );
-	Floor->Render(VertexTexTechnique);
+	models["Floor"]->Render(VertexTexTechnique);
 
-	WorldMatrixVar->SetMatrix( (float*)Light1->GetWorldMatrix() );
+	WorldMatrixVar->SetMatrix( (float*)lights[1]->GetWorldMatrix() );
 	//ModelColourVar->SetRawValue( Light1Colour, 0, 12 );
-	ModelColourVar->SetRawValue(cLight1Colour, 0, 12);
-	Light1->Render( PlainColourTechnique );
+	ModelColourVar->SetRawValue(lights[1]->GetColour(), 0, 12);
+	lights[1]->Render( PlainColourTechnique );
 
-	WorldMatrixVar->SetMatrix( (float*)Light2->GetWorldMatrix() );
+	WorldMatrixVar->SetMatrix( (float*)lights[2]->GetWorldMatrix() );
 	//ModelColourVar->SetRawValue( Light2Colour, 0, 12 );
-	ModelColourVar->SetRawValue(cLight2Colour, 0, 12);
-	Light2->Render( PlainColourTechnique );
+	ModelColourVar->SetRawValue(lights[2]->GetColour(), 0, 12);
+	lights[2]->Render( PlainColourTechnique );
 
 
 	//---------------------------
@@ -304,14 +294,14 @@ void RenderScene()
 
 void ReleaseResources()
 {
-	delete Light2;
-	delete Light1;
-	delete Floor;
-	delete Cube;
-	delete Cube2;
-	delete Car;
-	delete Sphere;
-	delete Teapot;
-	//delete Troll;
+	delete models["Cube"];
+	delete models["Cube2"];
+	delete models["Sphere"];
+	delete models["Floor"];
+	delete models["Teapot"];
+	delete models["Teapot2"];
+	delete models["Car"];
+	delete lights[1];
+	delete lights[2];
 	delete Camera;
 }
